@@ -1,9 +1,9 @@
 {
   "version": "0.1.0",
-  "name": "gridsome-source-google-docs",
+  "name": "@bwagener/gridsome-source-google-docs",
   "description": "Google docs source for Gridsome",
-  "homepage": "https://github.com/LokeCarlsson/gridsome-source-google-docs/tree/master#readme",
-  "repository": "https://github.com/LokeCarlsson/gridsome-source-google-docs",
+  "homepage": "https://github.com/BWagener/gridsome-source-google-docs/tree/master#readme",
+  "repository": "https://github.com/BWagener/gridsome-source-google-docs",
   "main": "index.js",
   "keywords": [
     "gridsome",
@@ -15,7 +15,7 @@
     "fs": "^0.0.1-security",
     "googleapis": "^40.0.0",
     "json2md": "^1.6.3",
-    "lodash": "^4.17.11",
+    "lodash": "^4.17.15",
     "readline-sync": "^1.4.9",
     "yamljs": "^0.3.0"
   },

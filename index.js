@@ -1,11 +1,14 @@
 const { getAuth } = require('./lib/auth')
 const { fetchGoogleDriveFiles } = require('./lib/google-drive')
 const { fetchGoogleDocsDocuments } = require('./lib/google-docs')
+const { mapValues, trim, trimEnd } = require('lodash')
 
 class GoogleDocsSource {
   static defaultOptions () {
     return {
       typeName: 'GoogleDocs',
+      refs: {},
+      // Google specific stuff
       accessType: 'offline',
       redirectUris: ['urn:ietf:wg:oauth:2.0:oob', 'http://localhost'],
       scope: [
@@ -16,13 +19,16 @@ class GoogleDocsSource {
       numNodes: 10,
       fields: ['createdTime'],
       fieldsMapper: { createdTime: 'date', name: 'title' },
-      fieldsDefault: { draft: false }
+      fieldsDefault: { draft: false },
     }
   }
 
   constructor (api, options) {
-    api.loadSource(async store => {
-      await this.createNodes(options, store)
+    this.refsCache = {}
+    this.options = options
+    api.loadSource(async (actions) => {
+      this.createCollections(actions)
+      await this.createNodes(options, actions)
     })
   }
 
@@ -62,29 +68,108 @@ class GoogleDocsSource {
     })
   }
 
-  async createNodes (options, { addContentType, slugify }) {
-    const documents = await this.fetchDocuments(options)
+  createCollections (actions) {
+    const addCollection = actions.addCollection || actions.addContentType
 
-    const contentType = addContentType({
-      typeName: options.typeName
+    this.refs = this.normalizeRefs(this.options.refs)
+
+    this.collection = addCollection({
+      typeName: this.options.typeName,
+      route: this.options.route
     })
 
-    const collection = []
+    mapValues(this.refs, (ref, key) => {
+      this.collection.addReference(key, ref.typeName)
 
+      if (ref.create) {
+        addCollection({
+          typeName: ref.typeName,
+          route: ref.route
+        })
+      }
+    })
+  }
+
+  async createNodes (options, actions) {
+    const documents = await this.fetchDocuments(options)
     documents.forEach(document => {
       console.log(document)
-      collection.push({
-        id: document.id,
-        date: document.date,
-        title: document.title,
-        body: document.markdown,
-        content: JSON.stringify(document.content),
-        slug: slugify(document.title)
-      })
+      const options = this.createNodeOptions(document, actions)
+      const node = this.collection.addNode(options)
+      this.createNodeRefs(node, actions)
     })
+  }
 
-    collection.forEach(item => contentType.addNode(item))
+  createNodeRefs (node, actions) {
+    for (const fieldName in this.refs) {
+      const ref = this.refs[fieldName]
+
+      if (node && node[fieldName] && ref.create) {
+        const value = node[fieldName]
+        const typeName = ref.typeName
+
+        if (Array.isArray(value)) {
+          value.forEach(value =>
+            this.addRefNode(typeName, fieldName, value, actions)
+          )
+        } else {
+          this.addRefNode(typeName, fieldName, value, actions)
+        }
+      }
+    }
+  }
+
+  // helpers
+
+  createNodeOptions (document, actions) {
+    const origin = 'GoogleDocs'
+    const content = document.markdown
+    const mimeType = 'text/markdown'
+
+    return {
+      ...document,
+      // body: document.markdown,
+      content: JSON.stringify(document.content),
+      // slug: actions.slugify(document.title),
+      // path: this.createPath({ dir, name }, actions),
+      internal: {
+        mimeType,
+        content,
+        origin
+      }
+    }
+  }
+
+  addRefNode (typeName, fieldName, value, actions) {
+    const getCollection = actions.getCollection || actions.getContentType
+    const cacheKey = `${typeName}-${fieldName}-${value}`
+
+    if (!this.refsCache[cacheKey] && value) {
+      this.refsCache[cacheKey] = true
+
+      getCollection(typeName).addNode({ id: value, title: value })
+    }
+  }
+  
+  normalizeRefs (refs) {
+    return mapValues(refs, (ref) => {
+      if (typeof ref === 'string') {
+        ref = { typeName: ref, create: false }
+      }
+      
+      if (!ref.typeName) {
+        ref.typeName = this.options.typeName
+      }
+      
+      if (ref.create) {
+        ref.create = true
+      } else {
+        ref.create = false
+      }
+      
+      return ref
+    })
   }
 }
-
+  
 module.exports = GoogleDocsSource
