@@ -14,8 +14,13 @@
   "dependencies": {
     "fs": "^0.0.1-security",
     "googleapis": "^40.0.0",
+    "https": "^1.0.0",
+    "image-type": "^4.1.0",
     "json2md": "^1.6.3",
     "lodash": "^4.17.15",
+    "path": "^0.12.7",
+    "queue": "^6.0.1",
+    "read-chunk": "^3.2.0",
     "readline-sync": "^1.4.9",
     "yamljs": "^0.3.0"
   },

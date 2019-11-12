@@ -1,7 +1,11 @@
 const { getAuth } = require('./lib/auth')
 const { fetchGoogleDriveFiles } = require('./lib/google-drive')
 const { fetchGoogleDocsDocuments } = require('./lib/google-docs')
+const convertJsonToMarkdown = require('./lib/convert-json-to-markdown')
+const file = require('./lib/file.js')
 const { mapValues, trim, trimEnd } = require('lodash')
+
+const ISDEV = process.env.NODE_ENV === 'development'
 
 class GoogleDocsSource {
   static defaultOptions () {
@@ -20,11 +24,19 @@ class GoogleDocsSource {
       fields: ['createdTime'],
       fieldsMapper: { createdTime: 'date', name: 'title' },
       fieldsDefault: { draft: false },
+      imageDirectory: 'gdocs_images',
+      downloadImages: true
     }
   }
 
   constructor (api, options) {
     this.refsCache = {}
+    
+    if (options.downloadImages) {
+      this.imageDirectory = options.imageDirectory
+      file.createDirectory(this.imageDirectory)
+    }
+
     this.options = options
     api.loadSource(async (actions) => {
       this.createCollections(actions)
@@ -92,12 +104,31 @@ class GoogleDocsSource {
 
   async createNodes (options, actions) {
     const documents = await this.fetchDocuments(options)
-    documents.forEach(document => {
-      console.log(document)
-      const options = this.createNodeOptions(document, actions)
-      const node = this.collection.addNode(options)
+
+    for (let index = 0; index < documents.length; index++) {
+      let document = documents[index]
+      // console.log('document', JSON.parse(JSON.stringify(document)))
+      let node = await this.normalizeField(document, actions)
+      // console.log('normalized node', JSON.parse(JSON.stringify(node)))
+      const content = node.content
+      delete node.content
+      const markdown = await convertJsonToMarkdown({ file: node, content: content })
+
+      const origin = 'GoogleDocs'
+      const mimeType = 'text/markdown'
+      
+      node = {...node,
+        markdown,
+        internal: {
+          mimeType,
+          content: markdown,
+          origin
+        }
+      }
+
+      node = this.collection.addNode(node)
       this.createNodeRefs(node, actions)
-    })
+    }
   }
 
   createNodeRefs (node, actions) {
@@ -120,26 +151,6 @@ class GoogleDocsSource {
   }
 
   // helpers
-
-  createNodeOptions (document, actions) {
-    const origin = 'GoogleDocs'
-    const content = document.markdown
-    const mimeType = 'text/markdown'
-
-    return {
-      ...document,
-      // body: document.markdown,
-      content: JSON.stringify(document.content),
-      // slug: actions.slugify(document.title),
-      // path: this.createPath({ dir, name }, actions),
-      internal: {
-        mimeType,
-        content,
-        origin
-      }
-    }
-  }
-
   addRefNode (typeName, fieldName, value, actions) {
     const getCollection = actions.getCollection || actions.getContentType
     const cacheKey = `${typeName}-${fieldName}-${value}`
@@ -147,7 +158,7 @@ class GoogleDocsSource {
     if (!this.refsCache[cacheKey] && value) {
       this.refsCache[cacheKey] = true
 
-      getCollection(typeName).addNode({ id: value, title: value })
+      getCollection(typeName).addNode({ id: value, title: value }, actions)
     }
   }
   
@@ -169,6 +180,60 @@ class GoogleDocsSource {
       
       return ref
     })
+  }
+
+  async normalizeField(field, actions) {
+    if (!field) return field
+    switch (typeof field) {
+      case "string":
+        if (field.match(/^https:\/\/.*\/.*\.(jpg|png|svg|gif|jpeg)($|\?)/i)) {
+          return await this.downloadImage(field, false, actions)
+        } else return field
+      case "number": return field
+      case "boolean": return field
+      case "object":
+        if (Array.isArray(field)) {
+          const tmp = []
+          for (let index = 0; index < field.length; index++) {
+            tmp.push(await this.normalizeField(field[index], actions))
+          }
+          return tmp
+        }
+
+        const tmp = {}
+        const keys = Object.keys(field)
+        
+        for (let index = 0; index < keys.length; index++) {
+          const p = keys[index]
+          if (field.hasOwnProperty(p))
+            if (p === 'img' && field[p].hasOwnProperty('source')) {
+              tmp[p] = field[p]
+              tmp[p].source = await this.downloadImage(field[p].source, true, actions)
+            } else {
+              tmp[p] = await this.normalizeField(field[p], actions)
+            }
+        }
+        return tmp
+    }
+  }
+
+  async downloadImage(url, isGoogleDocsImage, actions) {
+    const filename = file.getFilename(url)
+    const id = actions.makeUid(url)
+    const filepath = file.getFullPath(this.imageDirectory, filename)
+
+    if (!file.exists(filepath)) {
+      if (isGoogleDocsImage) {
+        return await file.downloadGoogleDocsImage(url, filepath)
+      } else {
+        file.download(url, filepath)
+        return filepath
+      }
+      
+    } else {
+      ISDEV && console.log(`${filename} already exists`)
+      return filepath
+    }
   }
 }
   
