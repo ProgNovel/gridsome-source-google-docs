@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "0.1.1",
   "name": "@bwagener/gridsome-source-google-docs",
   "description": "Google docs source for Gridsome",
   "homepage": "https://github.com/BWagener/gridsome-source-google-docs/tree/master#readme",
@@ -13,11 +13,11 @@
   ],
   "dependencies": {
     "fs": "^0.0.1-security",
-    "googleapis": "^40.0.0",
+    "googleapis": "^66.0.0",
     "https": "^1.0.0",
     "image-type": "^4.1.0",
-    "json2md": "^1.6.3",
-    "lodash": "^4.17.15",
+    "json2md": "^1.9.1",
+    "lodash": "^4.17.20",
     "path": "^0.12.7",
     "queue": "^6.0.1",
     "read-chunk": "^3.2.0",
