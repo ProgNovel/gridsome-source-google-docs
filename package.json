@@ -1,9 +1,9 @@
 {
   "version": "0.1.1",
-  "name": "@bwagener/gridsome-source-google-docs",
+  "name": "@prognovel/gridsome-source-google-docs",
   "description": "Google docs source for Gridsome",
-  "homepage": "https://github.com/BWagener/gridsome-source-google-docs/tree/master#readme",
-  "repository": "https://github.com/BWagener/gridsome-source-google-docs",
+  "homepage": "https://github.com/ProgNovel/gridsome-source-google-docs/tree/master#readme",
+  "repository": "https://github.com/ProgNovel/gridsome-source-google-docs",
   "main": "index.js",
   "keywords": [
     "gridsome",
