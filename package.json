@@ -1,5 +1,5 @@
 {
-  "version": "0.2.3",
+  "version": "0.2.4",
   "name": "@prognovel/gridsome-source-google-docs",
   "description": "Google docs source for Gridsome",
   "homepage": "https://github.com/ProgNovel/gridsome-source-google-docs/tree/master#readme",
